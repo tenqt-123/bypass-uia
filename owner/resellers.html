@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+
+{% block title %}Quản Lý Tài Khoản Khách & Đại Lý - Admin{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h1 style="color: var(--primary); margin: 0; font-size: 1.8rem; font-weight: 700;">
+            👥 Quản Lý Tài Khoản Khách & Đại Lý
+        </h1>
+        <p style="color: var(--text-secondary); margin: 0.3rem 0 0; font-size: 0.9rem;">
+            Tạo tài khoản khách, nạp/trừ credits, khóa tài khoản và kiểm soát toàn bộ người dùng
+        </p>
+    </div>
+</div>
+
+<!-- FORM TẠO TÀI KHOẢN KHÁCH MỚI -->
+<div class="card">
+    <h2 style="margin-bottom: 1.2rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary);">
+        <i class="fas fa-user-plus"></i> Tạo Tài Khoản Khách / Đại Lý Mới
+    </h2>
+
+    <form method="POST" action="{{ url_for('owner_add_reseller') }}">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.2rem;">
+            <div class="form-group">
+                <label for="username">Tên Đăng Nhập (Username) *</label>
+                <input type="text" id="username" name="username" required placeholder="Nhập tên tài khoản...">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Mật Khẩu *</label>
+                <input type="password" id="password" name="password" required placeholder="Nhập mật khẩu..." minlength="4">
+            </div>
+
+            <div class="form-group">
+                <label for="role">Loại Tài Khoản *</label>
+                <select id="role" name="role" style="width: 100%; padding: 0.75rem; background: rgba(10, 14, 26, 0.8); border: 1px solid var(--border-color); color: #fff; border-radius: 4px;">
+                    <option value="guest">👤 Khách Hàng (Guest)</option>
+                    <option value="reseller">💼 Đại Lý (Reseller)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="credits">Số Credits Ban Đầu</label>
+                <input type="number" id="credits" name="credits" value="100" step="0.01" min="0" placeholder="0.00">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-success" style="margin-top: 1.2rem; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="fas fa-check-circle"></i> Tạo Tài Khoản Ngay
+        </button>
+    </form>
+</div>
+
+<!-- DANH SÁCH TÀI KHOẢN -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-users"></i> Danh Sách Tài Khoản ({{ resellers|length }})
+        </h2>
+    </div>
+
+    {% if resellers %}
+    <div style="overflow-x: auto;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tên Tài Khoản</th>
+                    <th>Vai Trò</th>
+                    <th>Số Dư Credits</th>
+                    <th>Số UID Đã Tạo</th>
+                    <th>Trạng Thái</th>
+                    <th>Ngày Tạo</th>
+                    <th style="text-align: right;">Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reseller in resellers %}
+                <tr>
+                    <td>
+                        <strong style="color: #fff; font-size: 1rem;">{{ reseller.username }}</strong>
+                    </td>
+                    <td>
+                        {% if reseller.role in ['admin', 'owner'] %}
+                        <span class="badge" style="background: rgba(255, 215, 0, 0.2); color: #ffd700; border: 1px solid #ffd700;">👑 ADMIN</span>
+                        {% elif reseller.role == 'guest' %}
+                        <span class="badge badge-primary">👤 KHÁCH HÀNG</span>
+                        {% else %}
+                        <span class="badge badge-info" style="background: rgba(79, 209, 255, 0.2); color: #4fd1ff; border: 1px solid #4fd1ff;">💼 ĐẠI LÝ</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong style="color: #00ff88; font-size: 1.05rem;">
+                            {% if reseller.role in ['admin', 'owner'] %}
+                            ∞ (Không giới hạn)
+                            {% else %}
+                            ₹{{ "%.2f"|format(reseller.credits) }}
+                            {% endif %}
+                        </strong>
+                    </td>
+                    <td>
+                        <span class="badge" style="background: rgba(255, 255, 255, 0.1);">{{ reseller.uids.count() }} UIDs</span>
+                    </td>
+                    <td>
+                        {% if reseller.is_active %}
+                        <span class="badge badge-success"><i class="fas fa-check-circle"></i> Hoạt động</span>
+                        {% else %}
+                        <span class="badge badge-danger"><i class="fas fa-lock"></i> Đã Khóa</span>
+                        {% endif %}
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">{{ reseller.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <button onclick="showAddCreditsModal({{ reseller.id }}, '{{ reseller.username }}', {{ reseller.credits }})"
+                            class="btn btn-success"
+                            style="padding: 0.4rem 0.8rem; font-size: 0.85rem;" title="Nạp hoặc trừ credits">
+                            💰 Nạp/Trừ
+                        </button>
+
+                        <button onclick="showChangeCredsModal({{ reseller.id }}, '{{ reseller.username }}')"
+                            class="btn btn-primary"
+                            style="padding: 0.4rem 0.8rem; font-size: 0.85rem;" title="Đổi mật khẩu">
+                            🔑 Đổi Pass
+                        </button>
+
+                        <a href="{{ url_for('owner_toggle_user', user_id=reseller.id) }}"
+                            class="btn {% if reseller.is_active %}btn-danger{% else %}btn-success{% endif %}"
+                            style="padding: 0.4rem 0.8rem; font-size: 0.85rem;"
+                            onclick="return confirm('Bạn có chắc muốn {% if reseller.is_active %}KHÓA{% else %}MỞ KHÓA{% endif %} tài khoản {{ reseller.username }}?');">
+                            {% if reseller.is_active %}🔒 Khóa{% else %}🔓 Mở{% endif %}
+                        </a>
+
+                        <a href="{{ url_for('owner_delete_reseller', reseller_id=reseller.id) }}" 
+                            class="btn btn-danger"
+                            style="padding: 0.4rem 0.8rem; font-size: 0.85rem;"
+                            onclick="return confirm('CẢNH BÁO: Xóa vĩnh viễn tài khoản {{ reseller.username }} và tất cả UID liên quan?');">
+                            🗑️ Xóa
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color: #999; text-align: center; padding: 2rem;">Chưa có tài khoản khách nào. Hãy tạo tài khoản đầu tiên ở trên.</p>
+    {% endif %}
+</div>
+
+<!-- MODAL NẠP / TRỪ CREDITS -->
+<div id="addCreditsModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 480px; width: 90%; margin: 0; border: 1px solid var(--primary);">
+        <h2 style="margin-bottom: 1rem; color: var(--primary);">💰 Quản Lý Credits Khách Hàng</h2>
+
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(79, 209, 255, 0.1); border-radius: 6px;">
+            <div>Tài khoản: <strong id="modalResellerName" style="color: #fff;"></strong></div>
+            <div>Số dư hiện tại: <strong id="modalCurrentCredits" style="color: #00ff88;"></strong></div>
+        </div>
+
+        <form method="POST" id="addCreditsForm">
+            <div class="form-group">
+                <label for="amount">Số Tiền Muốn Nạp (Cộng Thêm)</label>
+                <input type="number" id="amount" name="amount" step="0.01" min="0.01" placeholder="Nhập số credits..." required>
+            </div>
+
+            <div style="display: flex; gap: 0.8rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">➕ Nạp Tiền</button>
+                <button type="button" class="btn btn-warning" onclick="submitDeduct()" style="flex: 1; background: #e67e22; color: #fff;">➖ Trừ Bớt</button>
+                <button type="button" class="btn btn-danger" onclick="hideAddCreditsModal()">Hủy</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL ĐỔI MẬT KHẨU KHÁCH -->
+<div id="changeCredsModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 480px; width: 90%; margin: 0; border: 1px solid var(--primary);">
+        <h2 style="margin-bottom: 1rem; color: var(--primary);">🔑 Đổi Mật Khẩu Khách Hàng</h2>
+
+        <form method="POST" id="changeCredsForm">
+            <div class="form-group">
+                <label>Tài Khoản Đang Chọn</label>
+                <input type="text" id="modalCurrentUsername" readonly style="background: rgba(255,255,255,0.05); color: #fff;">
+            </div>
+
+            <div class="form-group">
+                <label for="new_username">Tên Đăng Nhập Mới (Để trống nếu giữ nguyên)</label>
+                <input type="text" id="new_username" name="new_username" placeholder="Để trống nếu không đổi...">
+            </div>
+
+            <div class="form-group">
+                <label for="new_password">Mật Khẩu Mới *</label>
+                <input type="password" id="new_password" name="new_password" placeholder="Nhập mật khẩu mới..." minlength="4" required>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Lưu Thay Đổi</button>
+                <button type="button" class="btn btn-danger" onclick="hideChangeCredsModal()">Hủy</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentResellerId = null;
+
+    function showAddCreditsModal(resellerId, resellerName, currentCredits) {
+        currentResellerId = resellerId;
+        document.getElementById('modalResellerName').innerText = resellerName;
+        document.getElementById('modalCurrentCredits').innerText = '₹' + parseFloat(currentCredits).toFixed(2);
+        document.getElementById('addCreditsForm').action = `/owner/add_credits/${resellerId}`;
+        document.getElementById('addCreditsModal').style.display = 'flex';
+    }
+
+    function hideAddCreditsModal() {
+        document.getElementById('addCreditsModal').style.display = 'none';
+        document.getElementById('amount').value = '';
+    }
+
+    function submitDeduct() {
+        const amt = document.getElementById('amount').value;
+        if (!amt || parseFloat(amt) <= 0) {
+            alert('Vui lòng nhập số credits hợp lệ!');
+            return;
+        }
+        const form = document.getElementById('addCreditsForm');
+        form.action = `/owner/deduct_credits/${currentResellerId}`;
+        form.submit();
+    }
+
+    function showChangeCredsModal(resellerId, resellerName) {
+        document.getElementById('modalCurrentUsername').value = resellerName;
+        document.getElementById('changeCredsForm').action = `/owner/change_credentials/${resellerId}`;
+        document.getElementById('changeCredsModal').style.display = 'flex';
+    }
+
+    function hideChangeCredsModal() {
+        document.getElementById('changeCredsModal').style.display = 'none';
+        document.getElementById('new_username').value = '';
+        document.getElementById('new_password').value = '';
+    }
+
+    document.addEventListener('click', function (e) {
+        if (e.target.id === 'addCreditsModal') hideAddCreditsModal();
+        if (e.target.id === 'changeCredsModal') hideChangeCredsModal();
+    });
+</script>
+{% endblock %}
